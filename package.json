@@ -1,0 +1,40 @@
+{
+  "name": "coolify-monitor",
+  "version": "1.0.0",
+  "description": "Tray + dashboard monitoring untuk server Coolify (macOS, Windows, Linux). Launcher npm dengan menu setting interaktif.",
+  "bin": {
+    "coolify-monitor": "bin/cli.js"
+  },
+  "scripts": {
+    "start": "node bin/cli.js start",
+    "setup": "node bin/cli.js setup",
+    "postinstall": "node bin/postinstall.js"
+  },
+  "files": [
+    "bin/",
+    "assets/",
+    "web/",
+    "paths.py",
+    "tray_app.py",
+    "tray_app_win.py",
+    "background_monitor.py",
+    "uptime_tracker.py",
+    "coolify_client.py",
+    "monitor.py",
+    "display.py",
+    "requirements.txt",
+    "requirements-win.txt",
+    ".env.example"
+  ],
+  "engines": {
+    "node": ">=16"
+  },
+  "keywords": [
+    "coolify",
+    "monitoring",
+    "tray",
+    "dashboard",
+    "uptime"
+  ],
+  "license": "MIT"
+}

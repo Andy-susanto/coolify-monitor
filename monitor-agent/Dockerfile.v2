@@ -1,0 +1,5 @@
+FROM alpine:3.19
+RUN apk add --no-cache docker-cli python3
+COPY agent_v2.py /app/agent.py
+EXPOSE 9999
+CMD ["python3", "/app/agent.py"]

@@ -1,0 +1,65 @@
+name: Build Installers
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-win.txt
+
+      - name: Build .exe (PyInstaller)
+        run: pyinstaller coolify_monitor_win.spec
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CoolifyMonitor-windows
+          path: dist/CoolifyMonitor.exe
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install py2app
+
+      - name: Build .app (py2app)
+        run: python setup.py py2app
+
+      - name: Create .dmg
+        run: |
+          cd dist
+          mkdir -p dmg_stage
+          cp -R "Coolify Monitor.app" dmg_stage/
+          ln -sf /Applications dmg_stage/Applications
+          hdiutil create -volname "Coolify Monitor" -srcfolder dmg_stage -ov -format UDZO "Coolify-Monitor.dmg"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CoolifyMonitor-macos
+          path: dist/Coolify-Monitor.dmg

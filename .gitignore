@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Runtime / local config
+.env
+.web.pid
+.monitor.pid
+monitor.pid
+uptime.db
+
+# OS
+.DS_Store

@@ -1,0 +1,27 @@
+# Jangan ikutkan file rahasia / lokal ke paket npm
+.env
+.web.pid
+.monitor.pid
+monitor.pid
+uptime.db
+
+# Python build & cache
+__pycache__/
+*.py[cod]
+venv/
+build/
+dist/
+*.egg-info/
+
+# CI & dev-only
+.github/
+setup.py
+coolify_monitor_win.spec
+com.coolify.monitor.plist
+run_monitor.sh
+setup_monitor.sh
+monitor-agent/
+scripts/
+
+# OS
+.DS_Store

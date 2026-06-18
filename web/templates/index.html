@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coolify Monitor — UIN Jambi</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="shell">
+
+        <!-- Topbar -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <div class="topbar-brand">
+                    <span class="topbar-dot"></span>
+                    <span>Coolify Monitor <span class="topbar-brand-sep">—</span> <span class="topbar-brand-sub">UIN Jambi</span></span>
+                </div>
+                <span class="topbar-sep"></span>
+                <span class="topbar-meta" id="lastUpdate">—</span>
+            </div>
+            <div class="topbar-right">
+                <button class="alert-bell" id="alertBellBtn" onclick="toggleAlertPanel()" title="Alerts">
+                    <svg class="alert-bell-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                    <span class="alert-badge" id="alertBadge" style="display:none">0</span>
+                </button>
+                <label class="toggle-wrap">
+                    <input type="checkbox" id="autoRefresh" checked>
+                    <span class="toggle-track"></span>
+                    <span>Auto-refresh</span>
+                </label>
+                <button class="btn-ctrl" id="refreshBtn" onclick="fetchData()" title="Refresh (R)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                </button>
+                <a href="/logout" class="btn-ctrl logout-btn" title="Logout">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                </a>
+            </div>
+        </header>
+
+        <!-- Alert Panel (toggled by bell) -->
+        <div class="alert-panel" id="alertPanel" style="display:none">
+            <div class="alert-panel-header">
+                <span class="alert-panel-title">Active Alerts</span>
+                <button class="alert-panel-close" onclick="toggleAlertPanel()">×</button>
+            </div>
+            <div class="alert-panel-body" id="alertList">
+                <div class="alert-empty">No active alerts</div>
+            </div>
+        </div>
+
+        <!-- Error Bar -->
+        <div class="error-bar" id="errorBar">
+            <span>⚠</span>
+            <span id="errorText"></span>
+            <button class="error-bar-close" onclick="hideError()">×</button>
+        </div>
+
+        <!-- Stats -->
+        <section class="stats">
+            <div class="stat stat-servers">
+                <div class="stat-icon">🖥</div>
+                <div>
+                    <div class="stat-val" id="statServers">
+                        <span class="skeleton-inline"></span>
+                    </div>
+                    <div class="stat-label">Servers</div>
+                </div>
+            </div>
+            <div class="stat stat-projects">
+                <div class="stat-icon">📁</div>
+                <div>
+                    <div class="stat-val" id="statProjects">
+                        <span class="skeleton-inline"></span>
+                    </div>
+                    <div class="stat-label">Projects</div>
+                </div>
+            </div>
+            <div class="stat stat-apps">
+                <div class="stat-icon">🚀</div>
+                <div>
+                    <div class="stat-val" id="statApps">
+                        <span class="skeleton-inline"></span>
+                    </div>
+                    <div class="stat-label">Apps</div>
+                </div>
+            </div>
+            <div class="stat stat-services">
+                <div class="stat-icon">⚙</div>
+                <div>
+                    <div class="stat-val" id="statServices">
+                        <span class="skeleton-inline"></span>
+                    </div>
+                    <div class="stat-label">Services</div>
+                </div>
+            </div>
+            <div class="stat stat-databases">
+                <div class="stat-icon">🗄</div>
+                <div>
+                    <div class="stat-val" id="statDatabases">
+                        <span class="skeleton-inline"></span>
+                    </div>
+                    <div class="stat-label">Databases</div>
+                </div>
+            </div>
+            <div class="stat stat-running">
+                <div class="stat-icon">✓</div>
+                <div>
+                    <div class="stat-val" id="statRunning" style="color:var(--green)">
+                        <span class="skeleton-inline"></span>
+                    </div>
+                    <div class="stat-label">Running</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tabs -->
+        <nav class="tabbar">
+            <button class="tab-btn active" data-tab="applications" onclick="switchTab('applications')">
+                🚀 Applications <span class="tab-count" id="tabApps">0</span>
+            </button>
+            <button class="tab-btn" data-tab="services" onclick="switchTab('services')">
+                ⚙ Services <span class="tab-count" id="tabSvcs">0</span>
+            </button>
+            <button class="tab-btn" data-tab="databases" onclick="switchTab('databases')">
+                🗄 Databases <span class="tab-count" id="tabDbs">0</span>
+            </button>
+            <button class="tab-btn" data-tab="projects" onclick="switchTab('projects')">
+                📁 Projects <span class="tab-count" id="tabProjs">0</span>
+            </button>
+            <button class="tab-btn" data-tab="resources" onclick="switchTab('resources')">
+                📊 Resources <span class="tab-count" id="tabRes">—</span>
+            </button>
+            <button class="tab-btn" data-tab="servers" onclick="switchTab('servers')">
+                🖥 Servers <span class="tab-count" id="tabSrvs">0</span>
+            </button>
+            <button class="tab-btn" data-tab="uptime" onclick="switchTab('uptime')">
+                📈 Uptime <span class="tab-count" id="tabUptime">—</span>
+            </button>
+        </nav>
+
+        <!-- Search Bar -->
+        <div class="search-bar" id="searchBar">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="searchInput" class="search-input" placeholder="Filter by name, status, type…" autocomplete="off">
+            <button class="search-clear" id="searchClear" onclick="clearSearch()" style="display:none">×</button>
+            <span class="search-shortcut">/</span>
+        </div>
+
+        <!-- Panels -->
+        <section>
+            <!-- Applications -->
+            <div class="panel active" id="panel-applications">
+                <div class="tbl-wrap">
+                    <table id="tbl-applications">
+                        <thead><tr>
+                            <th>Name</th><th>Status</th><th>URL</th><th>Build</th><th>Branch</th><th></th>
+                        </tr></thead>
+                        <tbody>
+                            <tr><td colspan="6" class="loading-row"><div class="spinner"></div><span>Loading applications…</span></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Services -->
+            <div class="panel" id="panel-services">
+                <div class="tbl-wrap">
+                    <table id="tbl-services">
+                        <thead><tr>
+                            <th>Name</th><th>Status</th><th>Type</th><th>URL</th><th></th>
+                        </tr></thead>
+                        <tbody>
+                            <tr><td colspan="5" class="loading-row"><div class="spinner"></div><span>Loading services…</span></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Databases -->
+            <div class="panel" id="panel-databases">
+                <div class="tbl-wrap">
+                    <table id="tbl-databases">
+                        <thead><tr>
+                            <th>Name</th><th>Status</th><th>Type</th><th>Version</th><th>Host:Port</th><th></th>
+                        </tr></thead>
+                        <tbody>
+                            <tr><td colspan="6" class="loading-row"><div class="spinner"></div><span>Loading databases…</span></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Projects -->
+            <div class="panel" id="panel-projects">
+                <div class="tbl-wrap">
+                    <table id="tbl-projects">
+                        <thead><tr>
+                            <th>Name</th><th>UUID</th><th>Description</th>
+                        </tr></thead>
+                        <tbody>
+                            <tr><td colspan="3" class="loading-row"><div class="spinner"></div><span>Loading projects…</span></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Resources -->
+            <div class="panel" id="panel-resources">
+                <div class="res-grid" id="resGrid">
+                    <div class="res-card res-card-skeleton"><div class="skeleton-block"></div></div>
+                    <div class="res-card res-card-skeleton"><div class="skeleton-block"></div></div>
+                    <div class="res-card res-card-skeleton"><div class="skeleton-block"></div></div>
+                    <div class="res-card res-card-skeleton"><div class="skeleton-block"></div></div>
+                </div>
+                <div class="tbl-wrap" style="margin-top:16px">
+                    <table id="tbl-resources">
+                        <thead><tr>
+                            <th>Container</th><th>Project</th><th>CPU</th><th>Memory</th><th>Net I/O</th><th>Block I/O</th><th>PIDs</th>
+                        </tr></thead>
+                        <tbody>
+                            <tr><td colspan="7" class="loading-row"><div class="spinner"></div><span>Loading resources…</span></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Servers -->
+            <div class="panel" id="panel-servers">
+                <div class="tbl-wrap">
+                    <table id="tbl-servers">
+                        <thead><tr>
+                            <th>Name</th><th>Status</th><th>IP</th><th>Port</th><th>Usable</th>
+                        </tr></thead>
+                        <tbody>
+                            <tr><td colspan="5" class="loading-row"><div class="spinner"></div><span>Loading servers…</span></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Uptime -->
+            <div class="panel" id="panel-uptime">
+                <div class="uptime-toolbar">
+                    <div class="uptime-windows">
+                        <button class="uptime-win-btn active" data-win="24" onclick="setUptimeWindow(24)">24 jam</button>
+                        <button class="uptime-win-btn" data-win="168" onclick="setUptimeWindow(168)">7 hari</button>
+                        <button class="uptime-win-btn" data-win="720" onclick="setUptimeWindow(720)">30 hari</button>
+                    </div>
+                    <span class="uptime-hint" id="uptimeHint">Mencatat status sejak monitor dijalankan</span>
+                </div>
+                <div class="tbl-wrap">
+                    <table id="tbl-uptime">
+                        <thead><tr>
+                            <th>Name</th><th>Type</th><th>Uptime</th><th>Status</th><th>Downtime</th><th>Diukur</th>
+                        </tr></thead>
+                        <tbody>
+                            <tr><td colspan="6" class="loading-row"><div class="spinner"></div><span>Loading uptime…</span></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Empty -->
+        <div class="empty" id="emptyState" style="display:none">
+            <div class="empty-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </div>
+            <div class="empty-title">No Data Available</div>
+            <div class="empty-desc">Pastikan Coolify berjalan dan API key sudah dikonfigurasi.</div>
+        </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div class="modal-bg" id="detailModal" onclick="if(event.target===this)closeDetailModal()">
+        <div class="modal-box" style="max-width:900px;width:95vw">
+            <div class="modal-head">
+                <h3 id="detailTitle">Container Detail</h3>
+                <div style="display:flex;gap:8px;align-items:center">
+                    <span id="detailContainerName" class="c-dim" style="font-size:12px;font-family:var(--mono)"></span>
+                    <button class="modal-x" onclick="closeDetailModal()">×</button>
+                </div>
+            </div>
+            <div class="detail-tabs">
+                <button class="detail-tab active" data-dtab="processes" onclick="switchDetailTab('processes')">⚙ Processes</button>
+                <button class="detail-tab" data-dtab="config" onclick="switchDetailTab('config')">🔧 Config</button>
+                <button class="detail-tab" data-dtab="dlogs" onclick="switchDetailTab('dlogs')">📋 Logs</button>
+            </div>
+            <div class="modal-body" style="max-height:65vh;overflow:auto">
+                <div class="detail-panel active" id="dpanel-processes">
+                    <div class="spinner"></div> Loading processes…
+                </div>
+                <div class="detail-panel" id="dpanel-config">
+                    <div class="spinner"></div> Loading config…
+                </div>
+                <div class="detail-panel" id="dpanel-dlogs">
+                    <pre class="logs-pre" id="detailLogsContent">Loading logs…</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logs Modal -->
+    <div class="modal-bg" id="logsModal" onclick="if(event.target===this)closeLogsModal()">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h3 id="modalTitle">Logs</h3>
+                <button class="modal-x" onclick="closeLogsModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <pre id="logsContent" class="logs-pre"><div class="spinner"></div> Loading logs…</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Confirm Modal -->
+    <div class="confirm-overlay" id="confirmOverlay">
+        <div class="confirm-box">
+            <div class="confirm-icon" id="confirmIcon">⚠️</div>
+            <div class="confirm-title" id="confirmTitle">Are you sure?</div>
+            <div class="confirm-desc" id="confirmDesc">This action will affect the service.</div>
+            <div class="confirm-actions">
+                <button class="btn-ctrl" onclick="confirmCancel()">Cancel</button>
+                <button class="btn-ctrl btn-danger" id="confirmOk" onclick="confirmExecute()">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Keyboard Shortcut Help -->
+    <div class="kbd-help" id="kbdHelp" style="display:none">
+        <div class="kbd-help-row"><kbd>R</kbd> Refresh data</div>
+        <div class="kbd-help-row"><kbd>1</kbd>–<kbd>6</kbd> Switch tabs</div>
+        <div class="kbd-help-row"><kbd>/</kbd> Focus search</div>
+        <div class="kbd-help-row"><kbd>B</kbd> Toggle alerts</div>
+        <div class="kbd-help-row"><kbd>Esc</kbd> Close modals</div>
+        <div class="kbd-help-row"><kbd>?</kbd> Toggle this help</div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="foot foot-ok" id="footer">
+        <span class="foot-dot"></span>
+        <span>Coolify Monitor — UIN Jambi</span>
+        <span>·</span>
+        <span id="footerStatus">Connecting…</span>
+        <span class="foot-sep">·</span>
+        <span class="foot-kbd" onclick="toggleKbdHelp()" title="Keyboard shortcuts">⌨ Shortcuts</span>
+    </footer>
+
+    <script>window.__REFRESH_INTERVAL__ = {{ refresh_interval }} * 1000;</script>
+    <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,98 @@
+services:
+  monitor-agent:
+    image: python:3.12-alpine
+    container_name: coolify-monitor-agent
+    restart: unless-stopped
+    ports:
+      - "9999:9999"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - PORT=9999
+    command:
+      - sh
+      - -c
+      - |
+        apk add --no-cache docker-cli
+        cat > /tmp/agent.py << 'PYEOF'
+        import http.server, json, subprocess, os
+        PORT = 9999
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                result = {"ok": True, "server": {}, "stats": []}
+                try:
+                    with open("/proc/loadavg") as f:
+                        parts = f.read().split()
+                        result["server"]["load_1m"] = float(parts[0])
+                        result["server"]["load_5m"] = float(parts[1])
+                        result["server"]["load_15m"] = float(parts[2])
+                except:
+                    pass
+                try:
+                    with open("/proc/meminfo") as f:
+                        info = {}
+                        for line in f:
+                            kv = line.split(":")
+                            if len(kv) == 2:
+                                info[kv[0].strip()] = kv[1].strip()
+                        total = int(info.get("MemTotal", "0").split()[0]) * 1024
+                        avail = int(info.get("MemAvailable", "0").split()[0]) * 1024
+                        result["server"]["mem_total"] = total
+                        result["server"]["mem_used"] = total - avail
+                        result["server"]["mem_free"] = avail
+                except:
+                    pass
+                try:
+                    r = subprocess.run(["nproc"], capture_output=True, text=True, timeout=3)
+                    result["server"]["cpu_cores"] = int(r.stdout.strip())
+                except:
+                    pass
+                try:
+                    r = subprocess.run(["df", "-B1", "/"], capture_output=True, text=True, timeout=3)
+                    if r.returncode == 0:
+                        p = r.stdout.strip().split("\n")[1].split()
+                        result["server"]["disk_total"] = int(p[1])
+                        result["server"]["disk_used"] = int(p[2])
+                        result["server"]["disk_free"] = int(p[3])
+                except:
+                    pass
+                try:
+                    r = subprocess.run(
+                        ["docker", "stats", "--no-stream", "--format",
+                         "{{.Name}}|{{.CPUPerc}}|{{.MemUsage}}|{{.MemPerc}}|{{.NetIO}}|{{.BlockIO}}|{{.PIDs}}"],
+                        capture_output=True, text=True, timeout=20
+                    )
+                    for line in r.stdout.strip().split("\n"):
+                        if "|" in line:
+                            parts = line.split("|")
+                            if len(parts) >= 7:
+                                mem_parts = parts[2].split(" / ")
+                                net_parts = parts[4].split(" / ")
+                                block_parts = parts[5].split(" / ")
+                                result["stats"].append({
+                                    "name": parts[0],
+                                    "cpu": parts[1],
+                                    "cpu_percent": float(parts[1].replace("%", "")),
+                                    "mem_used": mem_parts[0].strip(),
+                                    "mem_limit": mem_parts[1].strip() if len(mem_parts) > 1 else "",
+                                    "mem_perc": parts[3],
+                                    "mem_percent": float(parts[3].replace("%", "")),
+                                    "net_in": net_parts[0].strip(),
+                                    "net_out": net_parts[1].strip() if len(net_parts) > 1 else "",
+                                    "block_read": block_parts[0].strip(),
+                                    "block_write": block_parts[1].strip() if len(block_parts) > 1 else "",
+                                    "pids": parts[6]
+                                })
+                except Exception as e:
+                    result["error"] = str(e)
+                self.wfile.write(json.dumps(result).encode())
+            def log_message(self, *args):
+                pass
+        print(f"Monitor Agent listening on port {PORT}")
+        http.server.HTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
+        PYEOF
+        python3 /tmp/agent.py
