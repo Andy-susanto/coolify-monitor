@@ -41,7 +41,71 @@ PROJECT_MAP_TTL = 300  # 5 minutes
 
 
 def get_client():
-    return CoolifyClient(COOLIFY_URL, COOLIFY_API_KEY)
+    # Baca fresh dari env agar perubahan via halaman Settings langsung berlaku.
+    url = os.getenv("COOLIFY_URL", COOLIFY_URL)
+    key = os.getenv("COOLIFY_API_KEY", COOLIFY_API_KEY)
+    return CoolifyClient(url, key)
+
+# ─── Config (.env) read/write ─────────────────────
+
+# Field yang boleh diatur lewat halaman Settings web.
+CONFIG_FIELDS = [
+    {"key": "COOLIFY_URL", "label": "Coolify URL", "type": "text",
+     "placeholder": "https://coolify.example.com"},
+    {"key": "COOLIFY_API_KEY", "label": "API Key", "type": "password",
+     "placeholder": "token dari Settings → API"},
+    {"key": "POLL_INTERVAL", "label": "Poll interval (detik)", "type": "number",
+     "default": "30"},
+    {"key": "ALERT_ON_RECOVERY", "label": "Alert saat resource pulih", "type": "bool",
+     "default": "true"},
+    {"key": "WEB_PORT", "label": "Port dashboard", "type": "number",
+     "default": "5555"},
+    {"key": "REFRESH_INTERVAL", "label": "Refresh dashboard (detik)", "type": "number",
+     "default": "5"},
+    {"key": "MONITOR_PASSWORD", "label": "Password dashboard (kosong = tanpa auth)",
+     "type": "password"},
+]
+SECRET_KEYS = {"COOLIFY_API_KEY", "MONITOR_PASSWORD", "FLASK_SECRET_KEY"}
+
+def _env_path():
+    return str(paths.env_file())
+
+def read_config():
+    """Baca .env jadi dict (hanya field yang dikenal)."""
+    values = {}
+    path = _env_path()
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            for raw in f:
+                line = raw.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                values[k.strip()] = v.strip()
+    return values
+
+def write_config(updates: dict):
+    """Tulis/ubah beberapa key di .env, pertahankan komentar & urutan."""
+    path = _env_path()
+    lines = []
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            lines = f.read().splitlines()
+    remaining = dict(updates)
+    for i, line in enumerate(lines):
+        s = line.strip()
+        if not s or s.startswith("#") or "=" not in s:
+            continue
+        key = s.split("=", 1)[0].strip()
+        if key in remaining:
+            lines[i] = f"{key}={remaining.pop(key)}"
+    for key, val in remaining.items():
+        lines.append(f"{key}={val}")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines).rstrip("\n") + "\n")
+    # Terapkan ke proses berjalan.
+    for key, val in updates.items():
+        os.environ[key] = val
 
 
 def login_required(f):
@@ -84,6 +148,66 @@ def logout():
 @login_required
 def index():
     return render_template("index.html", refresh_interval=REFRESH_INTERVAL)
+
+@app.route("/settings")
+@login_required
+def settings_page():
+    return render_template("settings.html")
+
+# ─── API: Config ──────────────────────────────────
+
+@app.route("/api/config", methods=["GET"])
+@login_required
+def api_config_get():
+    values = read_config()
+    fields = []
+    for f in CONFIG_FIELDS:
+        raw = values.get(f["key"], f.get("default", ""))
+        is_secret = f["key"] in SECRET_KEYS
+        fields.append({
+            "key": f["key"],
+            "label": f["label"],
+            "type": f["type"],
+            "placeholder": f.get("placeholder", ""),
+            # Jangan kirim nilai secret asli ke browser; cukup tandai sudah terisi.
+            "value": "" if is_secret else raw,
+            "is_secret": is_secret,
+            "is_set": bool(raw) and raw not in ("your-api-key-here", "your-password-here"),
+        })
+    return jsonify({"ok": True, "fields": fields})
+
+@app.route("/api/config", methods=["POST"])
+@login_required
+def api_config_post():
+    data = request.get_json(silent=True) or {}
+    allowed = {f["key"] for f in CONFIG_FIELDS}
+    updates = {}
+    for key, val in data.items():
+        if key not in allowed:
+            continue
+        val = "" if val is None else str(val).strip()
+        # Field secret: string kosong = jangan ubah (pertahankan nilai lama).
+        if key in SECRET_KEYS and val == "":
+            continue
+        updates[key] = val
+    if not updates:
+        return jsonify({"ok": True, "changed": 0})
+    try:
+        write_config(updates)
+        return jsonify({"ok": True, "changed": len(updates)})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route("/api/config/test", methods=["POST"])
+@login_required
+def api_config_test():
+    """Tes koneksi ke Coolify dengan config saat ini."""
+    try:
+        client = get_client()
+        client.health()
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)[:200]}), 200
 
 def get_cached_project_map():
     """Get container→project mapping with 5-min cache"""
@@ -549,11 +673,28 @@ def api_uptime_events(uuid):
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
-def run_server(host="127.0.0.1", port=None):
+def _start_monitor_thread():
+    """Auto-start background monitor in-process bila config valid.
+    Dipakai mode dashboard agar alert berjalan tanpa proses terpisah."""
+    url = os.getenv("COOLIFY_URL", "")
+    key = os.getenv("COOLIFY_API_KEY", "")
+    if not url or not key or key == "your-api-key-here":
+        print("[monitor] config belum lengkap — monitor tidak dijalankan. "
+              "Atur lewat /settings lalu restart.", flush=True)
+        return None
+    import threading
+    import background_monitor
+    monitor = background_monitor.BackgroundMonitor()
+    t = threading.Thread(target=monitor.run, daemon=True, name="coolify-monitor")
+    t.start()
+    return t
+
+def run_server(host="127.0.0.1", port=None, start_monitor=True):
     """Jalankan web server (dipakai standalone & in-process oleh tray app)."""
     _start_uptime_poller()
+    if start_monitor:
+        _start_monitor_thread()
     app.run(host=host, port=port or WEB_PORT, debug=False, use_reloader=False, threaded=True)
-
 
 if __name__ == "__main__":
     print(f"\n  Coolify Monitor Web UI")

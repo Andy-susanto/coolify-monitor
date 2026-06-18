@@ -99,6 +99,42 @@ function trayScript() {
   return process.platform === 'darwin' ? 'tray_app.py' : 'tray_app_win.py';
 }
 
+/** Buka URL di browser default lintas-OS. */
+function openBrowser(url) {
+  const cmd = process.platform === 'darwin' ? 'open'
+            : process.platform === 'win32' ? 'cmd' : 'xdg-open';
+  const args = process.platform === 'win32' ? ['/c', 'start', '', url] : [url];
+  try {
+    const child = spawn(cmd, args, { detached: true, stdio: 'ignore' });
+    child.unref();
+  } catch (_) { /* abaikan; URL tetap ditampilkan di terminal */ }
+}
+
+/** Mode dashboard (9router style): start web server + monitor in-process,
+ *  lalu auto-buka browser. Ini perilaku default `coolify-monitor`. */
+async function runDashboard() {
+  const env = lib.readEnv();
+  const port = env.WEB_PORT || '5555';
+  const url = `http://localhost:${port}`;
+
+  banner();
+  const configured = env.COOLIFY_URL && env.COOLIFY_API_KEY &&
+    env.COOLIFY_API_KEY !== 'your-api-key-here';
+  if (!configured) {
+    console.log(`${c.yellow}  Konfigurasi belum lengkap.${c.reset} Buka halaman Settings di dashboard untuk`);
+    console.log(`  mengisi Coolify URL & API Key.\n`);
+  }
+  console.log(`  Dashboard : ${c.bold}${url}${c.reset}`);
+  console.log(`  Settings  : ${c.bold}${url}/settings${c.reset}`);
+  console.log(`  ${c.dim}Tekan Ctrl+C untuk berhenti.${c.reset}\n`);
+
+  // Buka browser setelah jeda singkat agar server sempat listen.
+  setTimeout(() => openBrowser(configured ? url : `${url}/settings`), 1500);
+
+  // web/app.py menjalankan web server + auto-start monitor (foreground).
+  await waitChild(runPython('web/app.py'));
+}
+
 // ─── settings definisi ────────────────────────────────────────────
 
 const SETTINGS_GROUPS = [
@@ -256,11 +292,13 @@ function help() {
   console.log(`
   ${c.bold}Penggunaan:${c.reset} coolify-monitor [command]
 
-  ${c.cyan}(tanpa arg)${c.reset}   menu interaktif
-  ${c.cyan}setup${c.reset}        konfigurasi setting interaktif
-  ${c.cyan}start${c.reset}        jalankan tray app
-  ${c.cyan}monitor${c.reset}      jalankan monitor di foreground
-  ${c.cyan}dashboard${c.reset}    jalankan web dashboard
+  ${c.cyan}(tanpa arg)${c.reset}   start dashboard + monitor, auto-buka browser
+  ${c.cyan}start${c.reset}        sama dengan (tanpa arg) — mode dashboard
+  ${c.cyan}dashboard${c.reset}    sama dengan start
+  ${c.cyan}menu${c.reset}         menu interaktif di terminal
+  ${c.cyan}setup${c.reset}        konfigurasi setting via terminal
+  ${c.cyan}tray${c.reset}         jalankan tray icon (opsional)
+  ${c.cyan}monitor${c.reset}      jalankan monitor di foreground (tanpa web)
   ${c.cyan}config${c.reset}       tampilkan konfigurasi
   ${c.cyan}autostart${c.reset}    on | off
   ${c.cyan}doctor${c.reset}       cek environment Python & deps
@@ -274,11 +312,11 @@ function help() {
 async function main() {
   const [cmd, sub] = process.argv.slice(2);
   switch (cmd) {
-    case undefined: await mainMenu(); break;
+    case undefined: case 'start': case 'dashboard': await runDashboard(); break;
+    case 'menu': await mainMenu(); break;
     case 'setup': await setupWizard(); break;
-    case 'start': case 'tray': await waitChild(runPython(trayScript())); break;
+    case 'tray': await waitChild(runPython(trayScript())); break;
     case 'monitor': await waitChild(runPython('background_monitor.py')); break;
-    case 'dashboard': await waitChild(runPython('web/app.py')); break;
     case 'config': showConfig(); break;
     case 'autostart':
       if (sub === 'on') { autostart.enable(); console.log('Auto-start diaktifkan.'); }
