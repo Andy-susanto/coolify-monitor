@@ -7,8 +7,7 @@
   },
   "scripts": {
     "start": "node bin/cli.js start",
-    "setup": "node bin/cli.js setup",
-    "postinstall": "node bin/postinstall.js"
+    "setup": "node bin/cli.js setup"
   },
   "files": [
     "bin/",

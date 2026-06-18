@@ -74,7 +74,12 @@ function maskSecret(v) {
 // ─── run python ───────────────────────────────────────────────────
 
 function runPython(scriptRel, extraArgs = [], { detached = false } = {}) {
-  const py = ensurePython({ quiet: true });
+  // First-run (venv belum ada): tampilkan progres setup agar tidak terkesan hang.
+  const firstRun = !require('fs').existsSync(lib.venvPython());
+  if (firstRun) {
+    console.log(`${c.dim}Penyiapan awal: membuat Python environment & dependency (sekali saja)…${c.reset}`);
+  }
+  const py = ensurePython({ quiet: !firstRun });
   const script = path.join(lib.PKG_ROOT, scriptRel);
   const env = {
     ...process.env,
