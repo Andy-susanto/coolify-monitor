@@ -9,21 +9,35 @@ npm install -g github:Andy-susanto/coolify-monitor
 coolify-monitor
 ```
 
-Ketik `coolify-monitor` → web server + monitor jalan, lalu **browser otomatis terbuka** ke dashboard. Kalau konfigurasi belum lengkap, kamu langsung diarahkan ke halaman **Settings** untuk mengisi Coolify URL & API Key.
+Ketik `coolify-monitor` → monitor + web server jalan, browser otomatis terbuka, lalu muncul menu interaktif:
 
-> Syarat: **Python 3.9+** terpasang di mesin. Saat `npm install`, dependency Python disiapkan otomatis di direktori konfigurasi (tidak mengotori folder project).
+```
+  ● Coolify Monitor aktif  http://localhost:5555
+
+  1) Buka Dashboard       (http://localhost:5555)
+  2) Hide to Tray         (jalan di background)
+  3) Exit                 (hentikan monitor)
+```
+
+- **Buka Dashboard** — buka dashboard di browser
+- **Hide to Tray** — pindah ke tray/menu bar, monitor tetap jalan di background
+- **Exit** — hentikan monitor
+
+Kalau konfigurasi belum lengkap, browser langsung diarahkan ke halaman **Settings** untuk mengisi Coolify URL & API Key.
+
+> Syarat: **Python 3.9+** terpasang di mesin. Saat pertama dijalankan, dependency Python disiapkan otomatis di direktori konfigurasi (sekali saja, tidak mengotori folder project).
 
 Dapatkan API key dari Coolify UI → **Settings → API**.
 
 ## Cara Pakai
 
 ```bash
-coolify-monitor            # default: dashboard + monitor, auto-buka browser
+coolify-monitor            # menu interaktif: dashboard / hide to tray / exit
 coolify-monitor start      # sama dengan di atas
 coolify-monitor dashboard  # sama dengan di atas
-coolify-monitor tray       # jalankan tray icon (opsional)
+coolify-monitor tray       # langsung ke tray icon (tanpa menu)
 coolify-monitor monitor    # monitor di foreground (tanpa web)
-coolify-monitor menu       # menu interaktif di terminal
+coolify-monitor menu       # menu lengkap di terminal
 coolify-monitor setup      # konfigurasi via wizard terminal
 coolify-monitor config     # tampilkan konfigurasi saat ini
 coolify-monitor autostart on|off   # auto-start saat login
