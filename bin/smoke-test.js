@@ -111,10 +111,11 @@ function run() {
     : fail('Gagal impor modul inti', (rCore.stderr || '').trim().split('\n').pop());
 
   // Modul tray sesuai OS (butuh rumps/pystray; hanya jika venv ada).
+  // Pakai find_spec agar tidak memicu backend GUI pystray di lingkungan headless.
   if (hasVenv) {
-    const rTray = spawnSync(pyExe, ['-c', `import ${tray.lib}`], {
-      cwd: lib.PKG_ROOT, encoding: 'utf8',
-    });
+    const rTray = spawnSync(pyExe, ['-c',
+      `import importlib.util, sys; sys.exit(0 if importlib.util.find_spec(${JSON.stringify(tray.lib)}) else 1)`,
+    ], { cwd: lib.PKG_ROOT, encoding: 'utf8' });
     rTray.status === 0
       ? ok(`Library tray (${tray.lib}) terpasang`)
       : fail(`Library tray (${tray.lib}) tidak ada`, 'jalankan: coolify-monitor doctor');

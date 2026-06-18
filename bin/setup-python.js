@@ -13,11 +13,16 @@ function run(cmd, args, opts = {}) {
   return spawnSync(cmd, args, { stdio: 'inherit', ...opts });
 }
 
-/** Cek apakah dependency inti sudah terpasang di venv. */
+/** Cek apakah dependency inti sudah terpasang di venv.
+ *  Pakai find_spec (bukan import) agar tidak memicu backend GUI pystray
+ *  di lingkungan headless seperti CI. */
 function depsInstalled(py) {
-  const probe = process.platform === 'darwin'
-    ? 'import flask, requests, dotenv, rumps'
-    : 'import flask, requests, dotenv, pystray, PIL';
+  const mods = process.platform === 'darwin'
+    ? ['flask', 'requests', 'dotenv', 'rumps']
+    : ['flask', 'requests', 'dotenv', 'pystray', 'PIL'];
+  const probe =
+    'import importlib.util, sys; ' +
+    `sys.exit(0 if all(importlib.util.find_spec(m) for m in ${JSON.stringify(mods)}) else 1)`;
   const r = spawnSync(py, ['-c', probe], { encoding: 'utf8' });
   return r.status === 0;
 }

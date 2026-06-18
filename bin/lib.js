@@ -97,7 +97,9 @@ function findSystemPython() {
 function runtimeDeps() {
   const common = ['requests', 'python-dotenv', 'rich', 'Flask'];
   if (process.platform === 'darwin') return [...common, 'rumps'];
-  return [...common, 'pystray', 'Pillow'];
+  if (process.platform === 'win32') return [...common, 'pystray', 'Pillow'];
+  // Linux: pystray butuh backend X (python-xlib) untuk tray di desktop nyata.
+  return [...common, 'pystray', 'Pillow', 'python-xlib'];
 }
 
 module.exports = {
