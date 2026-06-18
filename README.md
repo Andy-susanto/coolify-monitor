@@ -1,55 +1,114 @@
 # Coolify Monitor
 
-CLI dashboard untuk monitoring container dan project di server Coolify.
+Monitoring real-time untuk server Coolify: web dashboard, notifikasi native saat resource down/recovery, tracking uptime, dan tray icon. Lintas platform — **macOS, Windows, Linux**.
 
-## Setup
-
-```bash
-cd /Users/uinjambi/Documents/project/coolify-monitor
-cp .env.example .env
-```
-
-Edit `.env`:
-- `COOLIFY_URL` — URL Coolify kamu (default: `http://localhost:8000`)
-- `COOLIFY_API_KEY` — API key dari Coolify UI → Settings → API
-
-## Usage
+## Quick Start
 
 ```bash
-# Activate venv
-source venv/bin/activate
-
-# Full dashboard overview
-python monitor.py dashboard
-
-# Specific views
-python monitor.py projects
-python monitor.py apps
-python monitor.py services
-python monitor.py databases
-python monitor.py servers
-
-# Application logs
-python monitor.py logs <app_name_or_uuid>
-
-# Auto-refresh mode (default 5s, configurable via REFRESH_INTERVAL in .env)
-python monitor.py watch
-python monitor.py watch apps
-
-# Check API connectivity
-python monitor.py health
+npm install -g github:Andy-susanto/coolify-monitor
+coolify-monitor
 ```
 
-## Quick Alias
+Ketik `coolify-monitor` → web server + monitor jalan, lalu **browser otomatis terbuka** ke dashboard. Kalau konfigurasi belum lengkap, kamu langsung diarahkan ke halaman **Settings** untuk mengisi Coolify URL & API Key.
 
-Tambahkan ke ~/.zshrc:
+> Syarat: **Python 3.9+** terpasang di mesin. Saat `npm install`, dependency Python disiapkan otomatis di direktori konfigurasi (tidak mengotori folder project).
+
+Dapatkan API key dari Coolify UI → **Settings → API**.
+
+## Cara Pakai
+
 ```bash
-alias cfm='python /Users/uinjambi/Documents/project/coolify-monitor/monitor.py'
+coolify-monitor            # default: dashboard + monitor, auto-buka browser
+coolify-monitor start      # sama dengan di atas
+coolify-monitor dashboard  # sama dengan di atas
+coolify-monitor tray       # jalankan tray icon (opsional)
+coolify-monitor monitor    # monitor di foreground (tanpa web)
+coolify-monitor menu       # menu interaktif di terminal
+coolify-monitor setup      # konfigurasi via wizard terminal
+coolify-monitor config     # tampilkan konfigurasi saat ini
+coolify-monitor autostart on|off   # auto-start saat login
+coolify-monitor doctor     # cek environment Python & dependency
+coolify-monitor smoke      # smoke test lintas-OS
+coolify-monitor help
 ```
 
-Lalu bisa pakai:
+## Konfigurasi
+
+Semua setting bisa diatur dari **halaman Settings di web dashboard** (`/settings`) — tanpa menyentuh terminal:
+
+| Setting | Keterangan |
+|---|---|
+| `COOLIFY_URL` | URL Coolify kamu |
+| `COOLIFY_API_KEY` | API key dari Coolify UI → Settings → API |
+| `POLL_INTERVAL` | Interval polling status (detik), default `30` |
+| `ALERT_ON_RECOVERY` | Kirim notifikasi juga saat resource pulih |
+| `WEB_PORT` | Port dashboard, default `5555` |
+| `REFRESH_INTERVAL` | Interval refresh dashboard (detik), default `5` |
+| `MONITOR_PASSWORD` | Password dashboard (kosong = tanpa auth) |
+
+Konfigurasi tersimpan di direktori writable per-OS:
+- macOS: `~/Library/Application Support/CoolifyMonitor/.env`
+- Windows: `%APPDATA%\CoolifyMonitor\.env`
+- Linux: `~/.config/coolify-monitor/.env`
+
+## Fitur
+
+- **Web dashboard** — status semua aplikasi, service, database secara real-time
+- **Notifikasi native** — alert saat resource down / recovery (macOS, Windows, Linux)
+- **Uptime tracking** — riwayat transisi status & persentase uptime (SQLite)
+- **Tray icon** (opsional) — kontrol monitor dari menu bar / system tray
+- **Halaman Settings web** — atur semua konfigurasi dari browser
+- **Auto-start saat login** — lintas OS (LaunchAgent / registry / `.desktop`)
+
+## Tray Icon
+
 ```bash
-cfm dashboard
-cfm apps
-cfm watch
+coolify-monitor tray
 ```
+
+Tray menyediakan: status monitor, start/stop, buka dashboard, lihat log, edit setting, dan toggle auto-start. Di macOS pakai backend native (rumps), di Windows/Linux pakai pystray.
+
+## Installer Desktop (alternatif npm)
+
+Tersedia juga installer desktop yang **membundel Python** (user tidak perlu install Python):
+
+- **macOS** — `.app` / `.dmg` (py2app)
+- **Windows** — `.exe` (PyInstaller)
+
+Build otomatis lewat GitHub Actions saat membuat tag rilis:
+
+```bash
+git tag v1.0.0 && git push origin v1.0.0
+```
+
+Artifact `.dmg` & `.exe` muncul di tab **Actions** / **Releases**.
+
+## Development
+
+```bash
+git clone https://github.com/Andy-susanto/coolify-monitor.git
+cd coolify-monitor
+npm install          # menyiapkan venv + dependency Python
+node bin/cli.js      # jalankan mode dashboard
+```
+
+CLI dashboard berbasis terminal (rich) juga tersedia:
+
+```bash
+python monitor.py dashboard    # overview
+python monitor.py apps         # daftar aplikasi
+python monitor.py watch        # auto-refresh
+python monitor.py health       # cek konektivitas API
+```
+
+## Verifikasi Lintas-OS
+
+```bash
+coolify-monitor smoke
+```
+
+Smoke test memverifikasi path config, Python venv, import modul, dan backend tray sesuai OS. CI menjalankannya otomatis di ubuntu, macOS, dan Windows (lihat `.github/workflows/smoke.yml`).
+
+## Lisensi
+
+MIT
