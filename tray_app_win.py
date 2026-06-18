@@ -194,24 +194,32 @@ class CoolifyTray:
 
     # ─── Dashboard ────────────────────────────────
 
+    def _start_web(self):
+        """Start web dashboard in-process (sekali). Monitor dikelola terpisah
+        oleh tray, jadi run_server dipanggil dengan start_monitor=False."""
+        if self._web_started:
+            return
+        port = _read_env_value("WEB_PORT", "5555")
+        from dotenv import load_dotenv
+        load_dotenv(ENV_FILE, override=True)
+
+        def _serve():
+            try:
+                import importlib
+                web_app = importlib.import_module("web.app")
+                web_app.run_server(host="127.0.0.1", port=int(port), start_monitor=False)
+            except Exception as e:
+                if self.icon:
+                    self.icon.notify(f"Web server error: {str(e)[:80]}", "Coolify Monitor")
+
+        t = threading.Thread(target=_serve, daemon=True, name="coolify-web")
+        t.start()
+        self._web_started = True
+
     def open_dashboard(self, icon, item):
         port = _read_env_value("WEB_PORT", "5555")
         if not self._web_started:
-            from dotenv import load_dotenv
-            load_dotenv(ENV_FILE, override=True)
-
-            def _serve():
-                try:
-                    import importlib
-                    web_app = importlib.import_module("web.app")
-                    web_app.run_server(host="127.0.0.1", port=int(port))
-                except Exception as e:
-                    if self.icon:
-                        self.icon.notify(f"Web server error: {str(e)[:80]}", "Coolify Monitor")
-
-            t = threading.Thread(target=_serve, daemon=True, name="coolify-web")
-            t.start()
-            self._web_started = True
+            self._start_web()
             time.sleep(2)
         webbrowser.open(f"http://localhost:{port}")
 
@@ -251,6 +259,11 @@ class CoolifyTray:
         icon.stop()
 
     def run(self):
+        # Auto-start monitor & web saat tray diluncurkan, bila config valid.
+        # Ini membuat "Hide to Tray" dari CLI benar-benar jalan di background.
+        if self._config_ok():
+            self.start_monitor()
+            self._start_web()
         self.icon.run()
 
 

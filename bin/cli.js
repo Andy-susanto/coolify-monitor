@@ -18,6 +18,8 @@
  */
 
 const path = require('path');
+const fs = require('fs');
+const http = require('http');
 const readline = require('readline');
 const { spawn } = require('child_process');
 
@@ -73,9 +75,9 @@ function maskSecret(v) {
 
 // ─── run python ───────────────────────────────────────────────────
 
-function runPython(scriptRel, extraArgs = [], { detached = false } = {}) {
+function runPython(scriptRel, extraArgs = [], { detached = false, stdio = 'inherit' } = {}) {
   // First-run (venv belum ada): tampilkan progres setup agar tidak terkesan hang.
-  const firstRun = !require('fs').existsSync(lib.venvPython());
+  const firstRun = !fs.existsSync(lib.venvPython());
   if (firstRun) {
     console.log(`${c.dim}Penyiapan awal: membuat Python environment & dependency (sekali saja)…${c.reset}`);
   }
@@ -94,7 +96,7 @@ function runPython(scriptRel, extraArgs = [], { detached = false } = {}) {
     return child;
   }
   const child = spawn(py, [script, ...extraArgs], {
-    cwd: lib.PKG_ROOT, env, stdio: 'inherit',
+    cwd: lib.PKG_ROOT, env, stdio,
   });
   return child;
 }
@@ -115,29 +117,90 @@ function openBrowser(url) {
   } catch (_) { /* abaikan; URL tetap ditampilkan di terminal */ }
 }
 
-/** Mode dashboard (9router style): start web server + monitor in-process,
- *  lalu auto-buka browser. Ini perilaku default `coolify-monitor`. */
+/** Tunggu sampai web server merespon (HTTP), atau timeout. */
+function waitForServer(url, timeoutMs = 30000) {
+  const start = Date.now();
+  return new Promise((resolve) => {
+    const tryOnce = () => {
+      const req = http.get(url, (res) => {
+        res.resume();
+        resolve(true);
+      });
+      req.on('error', () => {
+        if (Date.now() - start > timeoutMs) return resolve(false);
+        setTimeout(tryOnce, 400);
+      });
+      req.setTimeout(2000, () => req.destroy());
+    };
+    tryOnce();
+  });
+}
+
+/** Mode dashboard (9router style): start web+monitor sebagai engine background,
+ *  lalu tampilkan menu interaktif: Buka Dashboard / Hide to Tray / Exit. */
 async function runDashboard() {
   const env = lib.readEnv();
   const port = env.WEB_PORT || '5555';
   const url = `http://localhost:${port}`;
-
-  banner();
   const configured = env.COOLIFY_URL && env.COOLIFY_API_KEY &&
     env.COOLIFY_API_KEY !== 'your-api-key-here';
-  if (!configured) {
-    console.log(`${c.yellow}  Konfigurasi belum lengkap.${c.reset} Buka halaman Settings di dashboard untuk`);
-    console.log(`  mengisi Coolify URL & API Key.\n`);
+
+  banner();
+  console.log(`${c.dim}  Menjalankan Coolify Monitor…${c.reset}`);
+
+  // Start engine (web server + monitor in-process) sebagai child, log disenyapkan.
+  const engine = runPython('web/app.py', [], { stdio: 'ignore' });
+
+  const up = await waitForServer(url);
+  if (!up) {
+    console.log(`${c.red}  Gagal menjalankan server di ${url}.${c.reset}`);
+    console.log(`  ${c.dim}Cek apakah port ${port} sudah dipakai, atau jalankan: coolify-monitor doctor${c.reset}\n`);
+    try { engine.kill(); } catch (_) {}
+    return;
   }
-  console.log(`  Dashboard : ${c.bold}${url}${c.reset}`);
-  console.log(`  Settings  : ${c.bold}${url}/settings${c.reset}`);
-  console.log(`  ${c.dim}Tekan Ctrl+C untuk berhenti.${c.reset}\n`);
 
-  // Buka browser setelah jeda singkat agar server sempat listen.
-  setTimeout(() => openBrowser(configured ? url : `${url}/settings`), 1500);
+  console.log(`${c.green}  ● Coolify Monitor aktif${c.reset}  ${c.dim}${url}${c.reset}`);
+  if (!configured) {
+    console.log(`${c.yellow}  Konfigurasi belum lengkap — buka Dashboard lalu isi halaman Settings.${c.reset}`);
+  }
+  // Auto-buka browser sekali di awal (mirip 9router).
+  openBrowser(configured ? url : `${url}/settings`);
 
-  // web/app.py menjalankan web server + auto-start monitor (foreground).
-  await waitChild(runPython('web/app.py'));
+  let action = 'quit';
+
+  // Menu interaktif loop.
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    console.log(`
+  ${c.bold}1${c.reset}) Buka Dashboard       ${c.dim}(${url})${c.reset}
+  ${c.bold}2${c.reset}) Hide to Tray         ${c.dim}(jalan di background)${c.reset}
+  ${c.bold}3${c.reset}) Exit                 ${c.dim}(hentikan monitor)${c.reset}`);
+    const choice = await ask('\n  Pilih > ');
+    if (choice === '1') {
+      openBrowser(url);
+      console.log(`${c.dim}  Membuka ${url} di browser…${c.reset}`);
+    } else if (choice === '2') {
+      action = 'tray';
+      break;
+    } else if (choice === '3' || choice === '0' || choice === 'q') {
+      action = 'quit';
+      break;
+    } else {
+      console.log(`${c.red}  Pilihan tidak dikenal.${c.reset}`);
+    }
+  }
+
+  // Hentikan engine CLI.
+  try { engine.kill('SIGTERM'); } catch (_) {}
+
+  if (action === 'tray') {
+    // Luncurkan tray sebagai proses detached (tray auto-start monitor+web sendiri).
+    console.log(`${c.green}  Berpindah ke tray. Coolify Monitor tetap jalan di background.${c.reset}`);
+    console.log(`  ${c.dim}Klik ikon di menu bar / system tray untuk kontrol. Quit dari sana untuk berhenti.${c.reset}\n`);
+    runPython(trayScript(), [], { detached: true });
+  } else {
+    console.log(`${c.dim}  Coolify Monitor dihentikan. Sampai jumpa.${c.reset}\n`);
+  }
 }
 
 // ─── settings definisi ────────────────────────────────────────────

@@ -173,6 +173,12 @@ class CoolifyTrayApp(rumps.App):
         self._timer = rumps.Timer(self._on_tick, 5)
         self._timer.start()
 
+        # Auto-start monitor & web saat tray diluncurkan, bila config valid.
+        # Ini membuat "Hide to Tray" dari CLI benar-benar jalan di background.
+        if self._config_ok():
+            self.start_monitor()
+            self._start_web()
+
     # ─── State ────────────────────────────────────
 
     def _monitor_running(self) -> bool:
@@ -248,23 +254,31 @@ class CoolifyTrayApp(rumps.App):
 
     # ─── Dashboard (in-process Flask) ─────────────
 
+    def _start_web(self):
+        """Start web dashboard in-process (sekali). Monitor dikelola terpisah
+        oleh tray, jadi run_server dipanggil dengan start_monitor=False."""
+        if self._web_started:
+            return
+        port = _read_env_value("WEB_PORT", "5555")
+        from dotenv import load_dotenv
+        load_dotenv(ENV_FILE, override=True)
+
+        def _serve():
+            try:
+                import importlib
+                web_app = importlib.import_module("web.app")
+                web_app.run_server(host="127.0.0.1", port=int(port), start_monitor=False)
+            except Exception as e:
+                notify("Coolify Monitor", f"Web server error: {str(e)[:80]}")
+
+        t = threading.Thread(target=_serve, daemon=True, name="coolify-web")
+        t.start()
+        self._web_started = True
+
     def open_dashboard(self, _):
         port = _read_env_value("WEB_PORT", "5555")
         if not self._web_started:
-            from dotenv import load_dotenv
-            load_dotenv(ENV_FILE, override=True)
-
-            def _serve():
-                try:
-                    import importlib
-                    web_app = importlib.import_module("web.app")
-                    web_app.run_server(host="127.0.0.1", port=int(port))
-                except Exception as e:
-                    notify("Coolify Monitor", f"Web server error: {str(e)[:80]}")
-
-            t = threading.Thread(target=_serve, daemon=True, name="coolify-web")
-            t.start()
-            self._web_started = True
+            self._start_web()
             notify("Coolify Monitor", "Web dashboard dijalankan...")
             time.sleep(2)
         webbrowser.open(f"http://localhost:{port}")
