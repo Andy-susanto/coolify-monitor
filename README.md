@@ -89,13 +89,15 @@ Tersedia juga installer desktop yang **membundel Python** (user tidak perlu inst
 - **macOS** — `.app` / `.dmg` (py2app)
 - **Windows** — `.exe` (PyInstaller)
 
-Build otomatis lewat GitHub Actions saat membuat tag rilis:
+Rilis dibuat otomatis lewat GitHub Actions. Cukup naikkan `version` di `package.json` lalu push ke `main`:
 
 ```bash
-git tag v1.0.0 && git push origin v1.0.0
+# contoh: 1.0.0 -> 1.0.1
+npm version patch --no-git-tag-version
+git commit -am "release: v1.0.1" && git push
 ```
 
-Artifact `.dmg` & `.exe` muncul di tab **Actions** / **Releases**.
+Workflow akan membuat tag `vX.Y.Z`, membangun `.exe` + `.dmg`, lalu menerbitkan **GitHub Release** dengan catatan otomatis dari commit. Push tag manual (`git tag v1.0.0 && git push origin v1.0.0`) juga tetap memicu rilis. Installer muncul di tab **Releases**.
 
 ## Development
 
