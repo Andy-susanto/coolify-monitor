@@ -64,6 +64,10 @@ CONFIG_FIELDS = [
      "default": "5"},
     {"key": "MONITOR_PASSWORD", "label": "Password dashboard (kosong = tanpa auth)",
      "type": "password"},
+    {"key": "DEPLOY_ALERT", "label": "Alert hasil deploy aplikasi", "type": "bool",
+     "default": "false"},
+    {"key": "DEPLOY_ALERT_APPS", "label": "Aplikasi yang dipantau deploy-nya (kosong = semua)",
+     "type": "apps", "default": ""},
 ]
 SECRET_KEYS = {"COOLIFY_API_KEY", "MONITOR_PASSWORD", "FLASK_SECRET_KEY"}
 
@@ -206,6 +210,19 @@ def api_config_test():
         client = get_client()
         client.health()
         return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)[:200]}), 200
+
+@app.route("/api/apps", methods=["GET"])
+@login_required
+def api_apps():
+    """Daftar aplikasi (uuid + nama) untuk pemilihan deploy alert."""
+    try:
+        client = get_client()
+        apps = [{"uuid": a.get("uuid", ""), "name": a.get("name", "unknown")}
+                for a in client.get_applications() if a.get("uuid")]
+        apps.sort(key=lambda x: x["name"].lower())
+        return jsonify({"ok": True, "apps": apps})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)[:200]}), 200
 

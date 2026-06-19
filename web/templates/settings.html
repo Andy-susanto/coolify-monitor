@@ -47,6 +47,11 @@
         .field .badge-set { font-size: 0.72rem; color: var(--green); background: var(--green-bg); padding: 2px 8px; border-radius: 10px; margin-left: 8px; }
         .switch { display: flex; align-items: center; gap: 12px; }
         .switch input { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
+        .apps-list { max-height: 220px; overflow-y: auto; border: 1px solid var(--border-default); border-radius: var(--radius); padding: 8px; background: var(--bg-input); }
+        .app-item { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: var(--radius); cursor: pointer; }
+        .app-item:hover { background: var(--bg-raised); }
+        .app-item input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+        .app-item span { font-size: 0.9rem; }
         .actions { display: flex; gap: 12px; margin-top: 28px; }
         .btn { padding: 11px 20px; border-radius: var(--radius); font-size: 0.92rem; font-weight: 600; font-family: inherit; cursor: pointer; border: 1px solid transparent; transition: all .15s; }
         .btn-primary { background: var(--accent); color: #06201c; }
@@ -101,6 +106,13 @@
                             <input type="checkbox" id="${f.key}" ${checked ? 'checked' : ''}>
                             <label for="${f.key}" style="margin:0;cursor:pointer;">${f.label}</label>
                         </div>`;
+                } else if (f.type === 'apps') {
+                    wrap.innerHTML = `
+                        <label>${f.label}</label>
+                        <div class="apps-list" id="${f.key}" data-selected="${(f.value || '').replace(/"/g, '')}">
+                            <div class="hint">Memuat daftar aplikasi…</div>
+                        </div>
+                        <div class="hint">Centang aplikasi yang ingin dipantau deploy-nya. Tidak ada yang dicentang = semua aplikasi.</div>`;
                 } else {
                     const badge = f.is_secret && f.is_set ? '<span class="badge-set">tersimpan</span>' : '';
                     const ph = f.is_secret && f.is_set ? '•••••• (kosongkan = tidak diubah)' : (f.placeholder || '');
@@ -112,6 +124,32 @@
                 fieldsEl.appendChild(wrap);
             }
             window._fields = fields;
+            if (fields.some((f) => f.type === 'apps')) loadApps();
+        }
+
+        async function loadApps() {
+            const containers = document.querySelectorAll('.apps-list');
+            try {
+                const r = await fetch('/api/apps');
+                const d = await r.json();
+                containers.forEach((box) => {
+                    if (!d.ok) {
+                        box.innerHTML = `<div class="hint">Gagal memuat aplikasi: ${d.error || 'unknown'}. Pastikan koneksi Coolify benar.</div>`;
+                        return;
+                    }
+                    const selected = (box.dataset.selected || '').split(',').map((s) => s.trim()).filter(Boolean);
+                    if (!d.apps.length) { box.innerHTML = '<div class="hint">Tidak ada aplikasi ditemukan.</div>'; return; }
+                    box.innerHTML = d.apps.map((a) => `
+                        <label class="app-item">
+                            <input type="checkbox" value="${a.uuid}" ${selected.includes(a.uuid) ? 'checked' : ''}>
+                            <span>${a.name}</span>
+                        </label>`).join('');
+                });
+            } catch (e) {
+                containers.forEach((box) => {
+                    box.innerHTML = `<div class="hint">Gagal memuat aplikasi: ${e.message}</div>`;
+                });
+            }
         }
 
         function collect() {
@@ -119,8 +157,14 @@
             for (const f of window._fields) {
                 const el = document.getElementById(f.key);
                 if (!el) continue;
-                if (f.type === 'bool') out[f.key] = el.checked ? 'true' : 'false';
-                else out[f.key] = el.value;
+                if (f.type === 'bool') {
+                    out[f.key] = el.checked ? 'true' : 'false';
+                } else if (f.type === 'apps') {
+                    const checked = [...el.querySelectorAll('input[type=checkbox]:checked')].map((c) => c.value);
+                    out[f.key] = checked.join(',');
+                } else {
+                    out[f.key] = el.value;
+                }
             }
             return out;
         }

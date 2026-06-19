@@ -111,6 +111,22 @@ class CoolifyClient:
         """Get application container logs"""
         return self._get(f"/applications/{app_uuid}/logs?lines={lines}")
 
+    # ─── Deployments ─────────────────────────────
+
+    def get_running_deployments(self) -> list:
+        """Deployment yang sedang berjalan/antri (semua aplikasi)."""
+        return self._ensure_list(self._get("/deployments"))
+
+    def get_application_deployments(self, app_uuid: str, take: int = 10) -> list:
+        """Riwayat deployment untuk satu aplikasi (terbaru lebih dulu)."""
+        data = self._get(f"/deployments/applications/{app_uuid}?take={take}")
+        if isinstance(data, dict):
+            return data.get("deployments", [])
+        if isinstance(data, list):
+            return data
+        return []
+
+
     # ─── Container → Project Mapping ─────────────
 
     def get_container_project_map(self) -> dict:
