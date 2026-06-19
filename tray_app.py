@@ -47,26 +47,10 @@ TRAY_PLIST_DST = LAUNCH_AGENTS / f"{TRAY_LABEL}.plist"
 # ─── Helper: .env ─────────────────────────────────────────────────
 
 def _read_env_value(key: str, default: str = "") -> str:
-    if not ENV_FILE.exists():
-        return default
-    for line in ENV_FILE.read_text().splitlines():
-        line = line.strip()
-        if line.startswith(f"{key}="):
-            return line.split("=", 1)[1].strip()
-    return default
+    return paths.read_env_value(key, default, ENV_FILE)
 
 def _set_env_value(key: str, value: str):
-    lines = ENV_FILE.read_text().splitlines() if ENV_FILE.exists() else []
-    found = False
-    for i, line in enumerate(lines):
-        if line.strip().startswith(f"{key}="):
-            lines[i] = f"{key}={value}"
-            found = True
-            break
-    if not found:
-        lines.append(f"{key}={value}")
-    ENV_FILE.write_text("\n".join(lines) + "\n")
-    os.environ[key] = value
+    paths.set_env_value(key, value, ENV_FILE)
 
 # ─── Helper: log & notifikasi ─────────────────────────────────────
 

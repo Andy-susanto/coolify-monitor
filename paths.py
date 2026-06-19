@@ -75,3 +75,29 @@ def ensure_env() -> Path:
         else:
             target.write_text("")
     return target
+
+def read_env_value(key: str, default: str = "", env_path=None) -> str:
+    """Baca satu nilai dari file .env (tanpa load_dotenv)."""
+    target = Path(env_path) if env_path else env_file()
+    if not target.exists():
+        return default
+    for line in target.read_text().splitlines():
+        line = line.strip()
+        if line.startswith(f"{key}="):
+            return line.split("=", 1)[1].strip()
+    return default
+
+def set_env_value(key: str, value: str, env_path=None):
+    """Tulis/ubah satu key di .env, lalu terapkan ke proses berjalan."""
+    target = Path(env_path) if env_path else env_file()
+    lines = target.read_text().splitlines() if target.exists() else []
+    found = False
+    for i, line in enumerate(lines):
+        if line.strip().startswith(f"{key}="):
+            lines[i] = f"{key}={value}"
+            found = True
+            break
+    if not found:
+        lines.append(f"{key}={value}")
+    target.write_text("\n".join(lines) + "\n")
+    os.environ[key] = value
