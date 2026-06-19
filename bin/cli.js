@@ -371,6 +371,7 @@ function help() {
   ${c.cyan}autostart${c.reset}    on | off
   ${c.cyan}doctor${c.reset}       cek environment Python & deps
   ${c.cyan}smoke${c.reset}        smoke test lintas-OS (verifikasi cepat)
+  ${c.cyan}qa${c.reset}           QA check (import modul + fitur deploy alert)
   ${c.cyan}help${c.reset}         tampilkan bantuan ini
 `);
 }
@@ -393,6 +394,7 @@ async function main() {
       break;
     case 'doctor': doctor(); break;
     case 'smoke': require('./smoke-test').run(); break;
+    case 'qa': require('./qa').run(); break;
     case 'help': case '--help': case '-h': help(); break;
     default:
       console.log(`Command tidak dikenal: ${cmd}`);

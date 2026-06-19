@@ -1,4 +1,4 @@
-name: Smoke Test
+name: CI
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  smoke:
+  qa:
     strategy:
       fail-fast: false
       matrix:
@@ -34,3 +34,6 @@ jobs:
 
       - name: Smoke test
         run: node bin/cli.js smoke
+
+      - name: QA check
+        run: node bin/cli.js qa
